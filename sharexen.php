@@ -561,6 +561,25 @@ function upload_endpoint(&$data)
 		}
 	}
 
+	$files = fopen($file['tmp_name'],"r"); 
+	$content = fread($files,filesize($file['tmp_name'])); 
+	$plaintext = base64_encode($content);
+
+    $cipher = "aes-256-cbc";
+	if (in_array($cipher, openssl_get_cipher_methods()))
+	{
+	    //$ivlen = openssl_cipher_iv_length($cipher);
+	    //$iv = openssl_random_pseudo_bytes($ivlen);
+	    
+	    $key=bin2hex(openssl_random_pseudo_bytes(64, $cstrong));
+	    $ciphertext = openssl_encrypt($plaintext, $cipher, $key, $options=0);
+	    
+	    //$plaintext = openssl_decrypt($ciphertext, $cipher, $key, $options=0);
+	    $files = fopen($file['tmp_name'],"w");
+	    fwrite($files, $ciphertext);
+	    fclose($files);
+	}
+    
 	if (!move_uploaded_file($file['tmp_name'], $name))
 	{
 		error_die($data, 500, 'upload_failed');
