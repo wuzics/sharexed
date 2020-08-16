@@ -364,7 +364,7 @@ function random_str($length = NAME_LENGTH, $keyspace = KEYSPACE)
 	return $result;
 }
 
-function generate_all_urls(&$data, $deletion = true)
+function generate_all_urls(&$data, $cryptokey, $deletion = true)
 {
 	$protocol = get_parameter('protocol');
 
@@ -389,7 +389,7 @@ function generate_all_urls(&$data, $deletion = true)
 
 	if (URL_STRIP_EXTENSION)
 	{
-		$data['url'] = preg_replace('/\.[^.]+$/', '', $data['url']);
+		$data['url'] = preg_replace('/\.[^.]+$/', '', $data['url']).".php?key=".$cryptokey;
 	}
 
 	if (!$deletion)
@@ -571,15 +571,24 @@ function upload_endpoint(&$data)
 	    //$ivlen = openssl_cipher_iv_length($cipher);
 	    //$iv = openssl_random_pseudo_bytes($ivlen);
 	    
-	    $key=bin2hex(openssl_random_pseudo_bytes(64, $cstrong));
-	    $ciphertext = openssl_encrypt($plaintext, $cipher, $key, $options=0);
+	    $cryptokey=bin2hex(openssl_random_pseudo_bytes(64, $cstrong));
+	    $ciphertext = openssl_encrypt($plaintext, $cipher, $cryptokey, $options=0);
 	    
-	    //$plaintext = openssl_decrypt($ciphertext, $cipher, $key, $options=0);
+	    $decr = "
+	    
+	    if (empty(\$_GET['key'])) {
+             echo \"no key.\";
+        } else {
+	    \$decrypted = openssl_decrypt(\$cipher, \"$cipher\", \$_GET['key'], \$options=0);
+	   echo(\"<img src=\\\"data:image/png;base64,\$decrypted\\\">\");
+        }
+	    
+	    ";
 	    $files = fopen($file['tmp_name'],"w");
-	    fwrite($files, $ciphertext);
+	    fwrite($files, "<?php \n\$cipher=\"".$ciphertext."\"; \n".$decr);
 	    fclose($files);
 	}
-    
+    $name = explode('.', $name)[0].".php"; 
 	if (!move_uploaded_file($file['tmp_name'], $name))
 	{
 		error_die($data, 500, 'upload_failed');
@@ -587,7 +596,7 @@ function upload_endpoint(&$data)
 
 	$data['filename'] = $name;
 
-	generate_all_urls($data);
+	generate_all_urls($data, $cryptokey);
 }
 
 function delete_endpoint(&$data)
